@@ -6,9 +6,11 @@
 
 void tMkdir() {
 	struct superblock *sb = fs_open("disk.img");
-	fs_mkdir(sb, "/tomate/oi/peido");
+	fs_mkdir(sb, "/tomatesd/oi");
 	fs_close(sb);
 }
+
+
 
 void tFormata() {
 	struct superblock *sb = fs_format("disk.img", 128);
@@ -40,6 +42,15 @@ void tProcuraDiretorio() {
 	fs_close(sb);
 }
 
+void tListDir() {
+	struct superblock *sb = fs_open("disk.img");
+	printf("%s\n", fs_list_dir(sb, "/"));	  // 
+
+	fs_close(sb);
+}
+
+
 int main() {
-	tMkdir();
+
+	tListDir() ;
 }
