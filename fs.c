@@ -8,43 +8,7 @@
 #include <string.h>
 #include "fs.h"
 
-/* Build a new filesystem image in =fname (the file =fname should be present
- * in the OS's filesystem).  The new filesystem should use =blocksize as its
- * block size; the number of blocks in the filesystem will be automatically
- * computed from the file size.  The filesystem will be initialized with an
- * empty root directory.  This function returns NULL on error and sets errno
- * to the appropriate error code.  If the block size is smaller than
- * MIN_BLOCK_SIZE bytes, then the format fails and the function sets errno to
- * EINVAL.  If there is insufficient space to store MIN_BLOCK_COUNT blocks in
- * =fname, then the function fails and sets errno to ENOSPC. */
 
-typedef struct {
-	int64_t dirInode;
-	char *arq;
-} parDiretorioNome;
-
-parDiretorioNome * procuraDiretorio(struct superblock *sb, const char* fname) {
-	parDiretorioNome *pda = (parDiretorioNome *) malloc(sizeof(parDiretorioNome));
-	char *fnameCopy, *strAux, *strAux2;
-	int dirCount;
-	strcpy(fnameCopy, fname);
-	
-	dirCount = 0;
-	strAux = strtok(fnameCopy,"/");
-	while(strAux != NULL) {
-		dirCount++;
-		strAux = strtok(NULL,"/");
-	}
-	printf("%d\n", dirCount);
-	strcpy(fnameCopy, fname);
-	strAux = strtok(fnameCopy,"/");
-	while(strAux != NULL) {
-		// TODO - Recuperar o inode do diretorio
-		strAux = strtok(NULL,"/");
-	}
-
-	return pda;
-}
 
 unsigned long fsize(int fd) { // Obtem o tamanho do disco
     unsigned long len = (unsigned long) lseek(fd, 0, SEEK_END);
@@ -52,16 +16,108 @@ unsigned long fsize(int fd) { // Obtem o tamanho do disco
 }
 
 // Posiciona o cursos no local onde deve escrever e escreve no disco
-void escreverNoDisco(struct superblock* sb, void * data, int64_t pos, size_t tam) {
+void escreverNoDisco(struct superblock* sb, void * data, uint64_t pos, size_t tam) {
 	lseek(sb->fd, (pos*sb->blksz), SEEK_SET);
 	write(sb->fd, data, tam);
 }
 // Posiciona o cursos no local onde deve ler e lê do disco
-void lerDoDisco(struct superblock* sb, void * data, int64_t pos, size_t tam) {
+void lerDoDisco(struct superblock* sb, void * data, uint64_t pos, size_t tam) {
 	lseek(sb->fd, (pos*sb->blksz), SEEK_SET);
 	read(sb->fd, data, tam);
 }
+// Navega entre os diretórios para encontrar o último inode
+parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
+	parDiretorioNome *pda;
+	char *fnameCopy, *strAux, *strAux2;
+	int dirCount, i;
+	uint64_t dirCorrente;
+	
+	fnameCopy = (char *) malloc((strlen(fname) + 1) * sizeof(char));
+	strcpy(fnameCopy, fname); // Copia o caminho para uma string que pode ser modificada
+	
+	dirCount = 0; // Conta o número de diretorios que devem ser navegados antes de criar o diretorio
+	strAux = strtok(fnameCopy,"/");
+	while(strAux != NULL) {  // Faz a contagem
+		dirCount++;
+		strAux = strtok(NULL,"/");
+	}
+	
+	strcpy(fnameCopy, fname);
+	strAux = strtok(fnameCopy,"/");
+	i=1;
+	dirCorrente = sb->root;
+	errno = 0;
+	while(i<=dirCount) { // Todos os diretorios serao resolvidos dentro desse while
+		struct inode *dirInode, *fileInode;
+		struct nodeinfo *dirInfo, *fileInfo;
+		int j, count;
+		char achou = 0;
 
+		dirInode = (struct inode*) malloc(sb->blksz);
+		fileInode = (struct inode*) malloc(sb->blksz);
+		dirInfo = (struct nodeinfo*) malloc(sb->blksz);
+		fileInfo = (struct nodeinfo*) malloc(sb->blksz);
+
+		lerDoDisco(sb, (void *) dirInode, dirCorrente, sb->blksz);
+		lerDoDisco(sb, (void *) dirInfo, dirInode->meta, sb->blksz);
+		count = 0;
+		for(j=0; j < dirInfo->size; j++) {
+			if(count != 0 && count%(sb->blksz-32) == 0) {
+				lerDoDisco(sb, (void *) dirInode, dirInode->next, sb->blksz);
+			}
+			lerDoDisco(sb, (void *) fileInode, dirInode->links[j%(sb->blksz-32)], sb->blksz);
+			lerDoDisco(sb, (void *) fileInfo, fileInode->meta, sb->blksz);
+			if(i!=dirCount) { // Checa se o arquivo já existe
+				if(!strcmp(strAux, fileInfo->name)) {
+					if(fileInode->mode == IMDIR) {
+						dirCorrente = dirInode->links[j];
+						achou = 1;
+						break;
+					} else {
+						errno = ENOTDIR;
+						break;
+					}
+				}
+			} else {
+				if(!strcmp(strAux, fileInfo->name)) {
+					errno = EEXIST;
+					break;
+				}
+			}
+			count ++;
+		}
+
+		free(dirInode);
+		free(fileInode);
+		free(dirInfo);
+		free(fileInfo);
+		if(i!=dirCount && !achou) {
+			errno = ENOENT;
+		}
+		if(errno)
+			break;
+		if(i!=dirCount)
+			strAux = strtok(NULL,"/");
+		i++;
+	}
+	if(errno) {
+		free(fnameCopy);
+		return NULL;
+	}
+	if(strlen(strAux) > sb->blksz - 65) { // Checa se o nome é maior do que o fs aceita
+		errno = ENAMETOOLONG;
+		free(fnameCopy);
+		return NULL;
+	}
+	
+	pda = (parDiretorioNome *) malloc(sizeof(parDiretorioNome)); // Aloca estrutura de retorno
+	pda->dirInode = dirCorrente;
+	pda->arq = (char *) malloc((strlen(strAux) + 1)*sizeof(char));
+	strcpy(pda->arq, strAux);
+	free(fnameCopy);
+
+	return pda;
+}
 // Abre o disco e coloca o descritor em sb->fd
 struct superblock* openDisk(const char *fname) {
 	struct superblock* sb;
@@ -75,19 +131,6 @@ struct superblock* openDisk(const char *fname) {
 	}
 	return sb;
 }
-
-/*struct inode* createInode(char child, uint64_t parent, uint64_t size, char *name) {
-	if(mode == "IMCHILD") {
-
-	}
-	struct inode *in;
-	in = (struct inode*) malloc(sizeof(struct inode));
-
-
-	return in;
-}*/
-
-
 
 struct superblock * fs_format(const char *fname, uint64_t blocksize){
 	if (blocksize < MIN_BLOCK_SIZE) { // Verifica se o valor do blocksize é maior que o minimo.
@@ -107,7 +150,7 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize){
 		free(sb);
 		return NULL;
 	}
-	sb->freeblks = sb->blks - 4;
+	sb->freeblks = sb->blks - 3;
 	sb->freelist = 3;
 	sb->root= 1;
 	escreverNoDisco(sb, (void *) sb, 0, sizeof(struct superblock));
@@ -116,8 +159,8 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize){
 	{
 		struct inode *in;
 		struct nodeinfo *nodeIn;	
-		in = (struct inode*) malloc(sizeof(struct inode));
-		nodeIn = (struct nodeinfo*) malloc(sizeof(struct nodeinfo));
+		in = (struct inode*) malloc(sb->blksz);
+		nodeIn = (struct nodeinfo*) malloc(sb->blksz);
 
 		strcpy(nodeIn->name, "/");
 		nodeIn->size = 0;
@@ -127,8 +170,8 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize){
 		in->meta = 2;
 		in->next = 0;
 
-		escreverNoDisco(sb, (void *) in, 1, sizeof(struct inode));
-		escreverNoDisco(sb, (void *) nodeIn, 2, sizeof(struct nodeinfo));
+		escreverNoDisco(sb, (void *) in, 1, sb->blksz);
+		escreverNoDisco(sb, (void *) nodeIn, 2, sb->blksz);
 		free(in);
 		free(nodeIn);
 	}
@@ -136,12 +179,12 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize){
 	// freeblocks		
 		int i;
 		struct freepage* fpg;
-		fpg = (struct freepage*) malloc(sizeof(struct freepage));
+		fpg = (struct freepage*) malloc(sb->blksz);
 
 		for(i=3; i< sb->blks;i++) {
 			fpg->next = (i+1==sb->blks)?0:i+1;
 			fpg->count = 0;
-			escreverNoDisco(sb, (void *) fpg, i, sizeof(struct freepage));
+			escreverNoDisco(sb, (void *) fpg, i, sb->blksz);
 		}
 	}
 	/*flock(sb->fd, LOCK_UN);
@@ -149,9 +192,6 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize){
 	return sb;
 }
 
-/* Open the filesystem in =fname and return its superblock.  Returns NULL on
- * error, and sets errno accordingly.  If =fname does not contain a
- * 0xdcc605fs, then errno is set to EBADF. */
 struct superblock * fs_open(const char *fname){
 	int auxFd; // Descritor auxiliar para gravar em sb->fd
 	struct superblock* sb = openDisk(fname);
@@ -174,9 +214,6 @@ struct superblock * fs_open(const char *fname){
 	return sb;
 }
 
-/* Close the filesystem pointed to by =sb.  Returns zero on success and a
- * negative number on error.  If there is an error, all resources are freed
- * and errno is set appropriately. */
 int fs_close(struct superblock *sb){
 	if(sb == NULL)
 		return -1;
@@ -194,12 +231,8 @@ int fs_close(struct superblock *sb){
 	return 0;
 }
 
-/* Get a free block in the filesystem.  This block shall be removed from the
- * list of free blocks in the filesystem.  If there are no free blocks, zero
- * is returned.  If an error occurs, (uint64_t)-1 is returned and errno is set
- * appropriately. */
 uint64_t fs_get_block(struct superblock *sb){
-	int64_t blocoRetorno;
+	uint64_t blocoRetorno;
 	struct freepage *fp;
 
 	if(sb== NULL)
@@ -207,12 +240,12 @@ uint64_t fs_get_block(struct superblock *sb){
 	if(sb->freeblks == 0)
 		return 0;
 
-	fp = (struct freepage*) malloc(sizeof(struct freepage));
-	lerDoDisco(sb, (void *) fp, sb->freelist, sizeof(sb->blksz));
+	fp = (struct freepage*) malloc(sb->blksz);
+	lerDoDisco(sb, (void *) fp, sb->freelist, sb->blksz);
 	if(fp->count>0) {
 		blocoRetorno = fp->links[fp->count-1];
 		fp->count--;
-		escreverNoDisco(sb, (void *) fp, sb->freelist, sizeof(fp));
+		escreverNoDisco(sb, (void *) fp, sb->freelist, sb->blksz);
 	} else {
 		blocoRetorno = sb->freelist;
 		sb->freelist = fp->next;
@@ -222,20 +255,17 @@ uint64_t fs_get_block(struct superblock *sb){
 	return blocoRetorno;
 }
 
-/* Put =block back into the filesystem as a free block.  Returns zero on
- * success or a negative value on error.  If there is an error, errno is set
- * accordingly. */
 int fs_put_block(struct superblock *sb, uint64_t block){
 	struct freepage *fp;
 	if(sb == NULL)
 		return -1;
 	
-	fp = (struct freepage*) malloc(sizeof(struct freepage));
+	fp = (struct freepage*) malloc(sb->blksz);
 	fp->next = sb->freelist;
 	fp->count = 0;
 	sb->freelist = block;
 	sb->freeblks++;
-	escreverNoDisco(sb, (void *) fp, block, sizeof(struct freepage));
+	escreverNoDisco(sb, (void *) fp, block, sb->blksz);
 	free(fp);
 	return 0;
 }
@@ -258,8 +288,65 @@ int fs_unlink(struct superblock *sb, const char *fname){
 }
 
 int fs_mkdir(struct superblock *sb, const char *dname){
+	if(sb->freeblks<=1) {
+		errno = ENOSPC;
+		return -1;
+	}
+	parDiretorioNome* pda;
+	struct inode* inodeDir, inodeNewDir;
+	struct nodeinfo* nodeinfoDir, nodeinfoNewDir;
+	uint64_t lastMeta;
 
+	pda = procuraDiretorio(sb, dname);
+	if(pda==NULL)
+		return -1;
 
+	inodeDir = (struct inode*) malloc(sb->blksz);
+	nodeinfoDir = (struct nodeinfo*) malloc(sb->blksz);
+
+	lerDoDisco(sb, (void *) inodeDir, pda->dirInode, sb->blksz);
+	lerDoDisco(sb, (void *) nodeinfoDir, inodeDir->meta, sb->blksz);
+	lastMeta = pda->dirInode;
+	while(inodeDir->next!=0){
+		lastMeta = inodeDir->next;
+		lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
+	}
+
+	if(nodeinfoDir->size%(sb->blksz - 32)==0) {
+		if(sb->freeblks<=2) { // Será necessário mais um bloco para o novo inode.
+			errno = ENOSPC;
+			free(inodeDir);
+			free(nodeinfoDir);
+			return -1;
+		}		
+		struct inode* dirChild = (struct inode*) malloc(sb->blksz);
+		uint64_t newBlock = fs_get_block(struct superblock *sb);
+
+		dirChild->mode = IMCHILD;
+		dirChild->parent = (inodeDir->mode==IMCHILD)?inodeDir->parent:lastMeta;
+		dirChild->meta = lastMeta;
+		dirChild->next = 0;
+		inodeDir->next = newBlock;
+		
+		escreverNoDisco(sb, (void *) dirChild, newBlock, sb->blksz);
+		escreverNoDisco(sb, (void *) inodeDir, lastMeta, sb->blksz);
+		free(dirChild);
+		lerDoDisco(sb, (void *) inodeDir, newBlock, sb->blksz);
+	}
+
+	inodeNewDir = (struct inode*) malloc(sb->blksz);
+	nodeinfoNewDir = (struct nodeinfo*) malloc(sb->blksz);
+
+	nodeinfoNewDir->size = 0;
+	strcpy(nodeinfoNewDir->name, pda->arq);
+
+	// Pedir os blocos que faltam
+	// Criar as informações do inode
+	// Atualizar o diretório pai
+	// Dar free
+
+	
+	return 0;
 }
 
 int fs_rmdir(struct superblock *sb, const char *dname){
