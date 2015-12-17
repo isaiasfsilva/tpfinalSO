@@ -50,9 +50,8 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
 	while(i<=dirCount) { // Todos os diretorios serao resolvidos dentro desse while
 		struct inode *dirInode, *fileInode;
 		struct nodeinfo *dirInfo, *fileInfo;
-		int j, count;
+		uint64_t j;
 		char achou = 0;
-
 		dirInode = (struct inode*) malloc(sb->blksz);
 		fileInode = (struct inode*) malloc(sb->blksz);
 		dirInfo = (struct nodeinfo*) malloc(sb->blksz);
@@ -60,9 +59,8 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
 
 		lerDoDisco(sb, (void *) dirInode, dirCorrente, sb->blksz);
 		lerDoDisco(sb, (void *) dirInfo, dirInode->meta, sb->blksz);
-		count = 0;
 		for(j=0; j < dirInfo->size; j++) {
-			if(count != 0 && count%(sb->blksz-32) == 0) {
+			if(j != 0 && j%(sb->blksz-32) == 0) {
 				lerDoDisco(sb, (void *) dirInode, dirInode->next, sb->blksz);
 			}
 			lerDoDisco(sb, (void *) fileInode, dirInode->links[j%(sb->blksz-32)], sb->blksz);
@@ -70,7 +68,7 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
 			if(i!=dirCount) { // Checa se o arquivo já existe
 				if(!strcmp(strAux, fileInfo->name)) {
 					if(fileInode->mode == IMDIR) {
-						dirCorrente = dirInode->links[j];
+						dirCorrente = dirInode->links[j%(sb->blksz-32)];
 						achou = 1;
 						break;
 					} else {
@@ -84,7 +82,6 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
 					break;
 				}
 			}
-			count ++;
 		}
 
 		free(dirInode);
@@ -293,9 +290,9 @@ int fs_mkdir(struct superblock *sb, const char *dname){
 		return -1;
 	}
 	parDiretorioNome* pda;
-	struct inode* inodeDir, inodeNewDir;
-	struct nodeinfo* nodeinfoDir, nodeinfoNewDir;
-	uint64_t lastMeta;
+	struct inode* inodeDir, *inodeNewDir;
+	struct nodeinfo* nodeinfoDir, *nodeinfoNewDir;
+	uint64_t lastMeta, nodeBlock, infoBlock, metaInfo;
 
 	pda = procuraDiretorio(sb, dname);
 	if(pda==NULL)
@@ -306,45 +303,67 @@ int fs_mkdir(struct superblock *sb, const char *dname){
 
 	lerDoDisco(sb, (void *) inodeDir, pda->dirInode, sb->blksz);
 	lerDoDisco(sb, (void *) nodeinfoDir, inodeDir->meta, sb->blksz);
+	metaInfo = inodeDir->meta;
 	lastMeta = pda->dirInode;
 	while(inodeDir->next!=0){
 		lastMeta = inodeDir->next;
 		lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
 	}
 
-	if(nodeinfoDir->size%(sb->blksz - 32)==0) {
+	if(nodeinfoDir->size!= 0 && nodeinfoDir->size%(sb->blksz - 32)==0) {
 		if(sb->freeblks<=2) { // Será necessário mais um bloco para o novo inode.
 			errno = ENOSPC;
+			free(pda->arq);
+			free(pda);
 			free(inodeDir);
 			free(nodeinfoDir);
 			return -1;
 		}		
 		struct inode* dirChild = (struct inode*) malloc(sb->blksz);
-		uint64_t newBlock = fs_get_block(struct superblock *sb);
-
+		uint64_t newBlock = fs_get_block(sb);
+		// Cria o novo child
 		dirChild->mode = IMCHILD;
 		dirChild->parent = (inodeDir->mode==IMCHILD)?inodeDir->parent:lastMeta;
 		dirChild->meta = lastMeta;
 		dirChild->next = 0;
 		inodeDir->next = newBlock;
-		
+		// Salva os dados no disco
 		escreverNoDisco(sb, (void *) dirChild, newBlock, sb->blksz);
 		escreverNoDisco(sb, (void *) inodeDir, lastMeta, sb->blksz);
 		free(dirChild);
 		lerDoDisco(sb, (void *) inodeDir, newBlock, sb->blksz);
+		lastMeta = newBlock;
 	}
-
+	// Aloca a memória do novo arquivo
 	inodeNewDir = (struct inode*) malloc(sb->blksz);
 	nodeinfoNewDir = (struct nodeinfo*) malloc(sb->blksz);
-
+	// Cria o inode info
 	nodeinfoNewDir->size = 0;
 	strcpy(nodeinfoNewDir->name, pda->arq);
 
 	// Pedir os blocos que faltam
+	nodeBlock = fs_get_block(sb);
+	infoBlock = fs_get_block(sb);
 	// Criar as informações do inode
+	inodeNewDir->mode = IMDIR;
+	inodeNewDir->parent = pda->dirInode; // duvida
+	inodeNewDir->meta = infoBlock;
+	inodeNewDir->next = 0;
 	// Atualizar o diretório pai
+	inodeDir->links[nodeinfoDir->size%(sb->blksz-32)] = nodeBlock;
+	nodeinfoDir->size++;
+	// Salvar os dados em disco
+	escreverNoDisco(sb, (void *) inodeDir, lastMeta, sb->blksz);
+	escreverNoDisco(sb, (void *) nodeinfoDir, metaInfo, sb->blksz);
+	escreverNoDisco(sb, (void *) inodeNewDir, nodeBlock, sb->blksz);
+	escreverNoDisco(sb, (void *) nodeinfoNewDir, infoBlock, sb->blksz);
 	// Dar free
-
+	free(pda->arq);
+	free(pda);
+	free(inodeDir);
+	free(nodeinfoDir);
+	free(inodeNewDir);
+	free(nodeinfoNewDir);
 	
 	return 0;
 }
