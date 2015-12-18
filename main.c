@@ -4,9 +4,10 @@
 #include <errno.h>
 #include <string.h>
 
-void tMkdir() {
+void tMkdir(char dir[]) {
+	printf("criando %s\n", dir);
 	struct superblock *sb = fs_open("disk.img");
-	fs_mkdir(sb, "/tomatesd/oi");
+	fs_mkdir(sb, dir);
 	fs_close(sb);
 }
 
@@ -44,13 +45,27 @@ void tProcuraDiretorio() {
 
 void tListDir() {
 	struct superblock *sb = fs_open("disk.img");
-	printf("%s\n", fs_list_dir(sb, "/"));	  // 
+	printf("%s\n\n", fs_list_dir(sb, "/home/"));	  // 
 
 	fs_close(sb);
 }
 
 
 int main() {
+tFormata();
+tMkdir("/home");
 
-	tListDir() ;
+int i;
+char dir[50]="/home/usr";
+for(i=0;i<50;i++){
+	char dirtemp[50]="";
+	char buffer[60];
+	strcpy(dirtemp,dir);
+	sprintf(buffer, "%d", i);
+	strcat(dirtemp,buffer);
+	tMkdir(dirtemp);
+	tListDir();
+
+}
+
 }
