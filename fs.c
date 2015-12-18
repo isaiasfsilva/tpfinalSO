@@ -86,7 +86,6 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname, cha
 					}
 				} else {
 					if(!strcmp(strAux, fileInfo->name)) {
-						dirCorrente = dirInode->links[j%INODE_LINKS_LIMIT];
 						achou = 1;
 						break;
 					}

@@ -35,7 +35,7 @@ void tPutBlock() {
 void tProcuraDiretorio() {
 	struct superblock *sb = fs_open("disk.img");
 	parDiretorioNome* teste;
-	const char *strz = "/tomate/oi/peido/josias";
+	const char *strz = "/filead/";
 	
 	teste = procuraDiretorio(sb, strz, 0);
 	if(teste == NULL)
@@ -70,6 +70,5 @@ void tListDir() {
 
 
 int main() {
-	tAltosMkdir();
-	tListDir();
+	tProcuraDiretorio();
 }
