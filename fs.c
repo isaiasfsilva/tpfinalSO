@@ -185,6 +185,7 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize){
 			fpg->count = 0;
 			escreverNoDisco(sb, (void *) fpg, i, sb->blksz);
 		}
+		free(fpg);
 	}
 	/*flock(sb->fd, LOCK_UN);
 	close(sb->fd);*/
@@ -408,11 +409,11 @@ char * fs_list_dir(struct superblock *sb, const char *dname){
 	int j;
 	for(j=0; j < nodeinfoDir->size; j++) {
 		
-		if(j != 0 && j%(sb->blksz-32) == 0) {
+		if(j!=0 && j%INODE_LINKS_LIMIT==0)  {
 			lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
 		}
 
-		lerDoDisco(sb, (void *) fileInode, inodeDir->links[j%(sb->blksz-32)], sb->blksz);
+		lerDoDisco(sb, (void *) fileInode, inodeDir->links[j%INODE_LINKS_LIMIT], sb->blksz);
 		lerDoDisco(sb, (void *) fileInfo, fileInode->meta, sb->blksz);
 
 		strcat(strRetorno, fileInfo->name);
@@ -427,7 +428,13 @@ char * fs_list_dir(struct superblock *sb, const char *dname){
 	}
 
     //COMO DAR FREE NA VARIAVEL strRetorno???????
- 
+ 	free(pda->arq);
+	free(pda);
+	free(inodeDir);
+	free(nodeinfoDir);
+	free(fileInfo);
+	free(fileInode);
+	free(fnameCopy);
 	return strRetorno;
 	
 }

@@ -61,11 +61,14 @@ tAltosMkdir() {
 
 void tListDir() {
 	struct superblock *sb = fs_open("disk.img");
-	printf("%s\n\n", fs_list_dir(sb, "/home/"));	  // 
-
+	char *as = fs_list_dir(sb, "/");
+	printf("%s\n\n", as);	  // 
+	free(as);
 	fs_close(sb);
 }
 
 
 int main() {
+	tAltosMkdir();
+	tListDir();
 }
