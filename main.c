@@ -3,6 +3,7 @@
 #include "fs.h"
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 void tMkdir(char dir[]) {
 	printf("criando %s\n", dir);
@@ -36,7 +37,7 @@ void tProcuraDiretorio() {
 	parDiretorioNome* teste;
 	const char *strz = "/tomate/oi/peido/josias";
 	
-	teste = procuraDiretorio(sb, strz);
+	teste = procuraDiretorio(sb, strz, 0);
 	if(teste == NULL)
 		perror("ERRO");
 	printf("%s\n%lu\n", teste->arq, teste->dirInode);

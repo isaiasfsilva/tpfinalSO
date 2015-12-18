@@ -129,6 +129,6 @@ int fs_mkdir(struct superblock *sb, const char *dname);
 int fs_rmdir(struct superblock *sb, const char *dname);
 
 char * fs_list_dir(struct superblock *sb, const char *dname);
-parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname);
+parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname, char removeFlag);
 
 #endif
