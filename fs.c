@@ -8,7 +8,8 @@
 #include <string.h>
 #include "fs.h"
 
-
+#define INODE_LINKS_LIMIT ((sb->blksz-32)/sizeof(uint64_t))
+#define NODEINFO_NAME_LIMIT (sb->blksz - 65)
 
 unsigned long fsize(int fd) { // Obtem o tamanho do disco
     unsigned long len = (unsigned long) lseek(fd, 0, SEEK_END);
@@ -60,15 +61,15 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
 		lerDoDisco(sb, (void *) dirInode, dirCorrente, sb->blksz);
 		lerDoDisco(sb, (void *) dirInfo, dirInode->meta, sb->blksz);
 		for(j=0; j < dirInfo->size; j++) {
-			if(j != 0 && j%(sb->blksz-32) == 0) {
+			if(j != 0 && j%INODE_LINKS_LIMIT == 0) {
 				lerDoDisco(sb, (void *) dirInode, dirInode->next, sb->blksz);
 			}
-			lerDoDisco(sb, (void *) fileInode, dirInode->links[j%(sb->blksz-32)], sb->blksz);
+			lerDoDisco(sb, (void *) fileInode, dirInode->links[j%INODE_LINKS_LIMIT], sb->blksz);
 			lerDoDisco(sb, (void *) fileInfo, fileInode->meta, sb->blksz);
 			if(i!=dirCount) { // Checa se o arquivo já existe
 				if(!strcmp(strAux, fileInfo->name)) {
 					if(fileInode->mode == IMDIR) {
-						dirCorrente = dirInode->links[j%(sb->blksz-32)];
+						dirCorrente = dirInode->links[j%INODE_LINKS_LIMIT];
 						achou = 1;
 						break;
 					} else {
@@ -310,7 +311,8 @@ int fs_mkdir(struct superblock *sb, const char *dname){
 		lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
 	}
 
-	if(nodeinfoDir->size!= 0 && nodeinfoDir->size%(sb->blksz - 32)==0) {
+	if(nodeinfoDir->size!= 0 && nodeinfoDir->size%INODE_LINKS_LIMIT==0) {
+		printf("I WANNA HEAL\n");
 		if(sb->freeblks<=2) { // Será necessário mais um bloco para o novo inode.
 			errno = ENOSPC;
 			free(pda->arq);
@@ -350,7 +352,7 @@ int fs_mkdir(struct superblock *sb, const char *dname){
 	inodeNewDir->meta = infoBlock;
 	inodeNewDir->next = 0;
 	// Atualizar o diretório pai
-	inodeDir->links[nodeinfoDir->size%(sb->blksz-32)] = nodeBlock;
+	inodeDir->links[nodeinfoDir->size%INODE_LINKS_LIMIT] = nodeBlock;
 	nodeinfoDir->size++;
 	// Salvar os dados em disco
 	escreverNoDisco(sb, (void *) inodeDir, lastMeta, sb->blksz);

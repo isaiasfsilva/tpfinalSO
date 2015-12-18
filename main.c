@@ -6,7 +6,7 @@
 
 void tMkdir() {
 	struct superblock *sb = fs_open("disk.img");
-	fs_mkdir(sb, "/tomate/oi/peido");
+	fs_mkdir(sb, "/tomate/oi/peido14");
 	fs_close(sb);
 }
 
@@ -40,6 +40,22 @@ void tProcuraDiretorio() {
 	fs_close(sb);
 }
 
+tAltosMkdir() {
+	int i;
+	char filename[550];
+	printf("Formating... ");
+	//struct superblock *sb = fs_open("disk.img");
+	struct superblock *sb = fs_format("disk.img", 128);
+	printf("Done\n");
+	for(i=0;i<=100;i++) {
+		printf("Creating file%d... ", i);
+		sprintf(filename, "file%d", i);
+		fs_mkdir(sb, filename);
+		printf("Done\n");
+	}
+	fs_close(sb);
+}
+
 int main() {
-	tMkdir();
+	tAltosMkdir();
 }
