@@ -32,6 +32,7 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname) {
 	char *fnameCopy, *strAux, *strAux2;
 	int dirCount, i;
 	uint64_t dirCorrente;
+
 	
 	fnameCopy = (char *) malloc((strlen(fname) + 1) * sizeof(char));
 	strcpy(fnameCopy, fname); // Copia o caminho para uma string que pode ser modificada
@@ -376,8 +377,57 @@ int fs_rmdir(struct superblock *sb, const char *dname){
 
 }
 
+
+//por enqautno eu acho que só lista diretorios. o link para o inode dos arquivos também está no links do inode do diretorio??? [Se Sim, então vai listar tudo]
 char * fs_list_dir(struct superblock *sb, const char *dname){
+	parDiretorioNome* pda;
+	struct inode* inodeDir, *fileInode;
+	struct nodeinfo* nodeinfoDir, *fileInfo;
+	char *fnameCopy, *strRetorno;
 
+	fnameCopy = (char *) malloc((strlen(dname) + 1) * sizeof(char));
+	strcpy(fnameCopy, dname); // Copia o caminho para uma string que pode ser modificada
 
+	strcat(fnameCopy," "); //Ele só add um espaco no final para a funcao [procuraDiretorio] retornar bonitinho *.*
+
+	pda = procuraDiretorio(sb, fnameCopy);
+	if(pda==NULL)
+		return NULL;
+
+	inodeDir = (struct inode*) malloc(sb->blksz);
+	nodeinfoDir = (struct nodeinfo*) malloc(sb->blksz);
+	fileInfo = (struct nodeinfo*) malloc(sb->blksz);
+	fileInode = (struct inode*) malloc(sb->blksz);
+
+	lerDoDisco(sb, (void *) inodeDir, pda->dirInode, sb->blksz);
+	lerDoDisco(sb, (void *) nodeinfoDir, inodeDir->meta, sb->blksz);
+
+	strRetorno = (char *)malloc((nodeinfoDir->size * 255) * sizeof(char)); // Quantidade de itens * o máximo de cada nome
+	strcpy(strRetorno,"");
+
+	int j;
+	for(j=0; j < nodeinfoDir->size; j++) {
+		
+		if(j != 0 && j%(sb->blksz-32) == 0) {
+			lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
+		}
+
+		lerDoDisco(sb, (void *) fileInode, inodeDir->links[j%(sb->blksz-32)], sb->blksz);
+		lerDoDisco(sb, (void *) fileInfo, fileInode->meta, sb->blksz);
+
+		strcat(strRetorno, fileInfo->name);
+
+		if(fileInode->mode==IMDIR){			
+			strcat(strRetorno, "/");
+		}
+
+		strcat(strRetorno, " "); //add espaço na frente do nome pra separar
+		
+
+	}
+
+    //COMO DAR FREE NA VARIAVEL strRetorno???????
+ 
+	return strRetorno;
 	
 }

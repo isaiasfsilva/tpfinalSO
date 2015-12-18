@@ -4,11 +4,14 @@
 #include <errno.h>
 #include <string.h>
 
-void tMkdir() {
+void tMkdir(char dir[]) {
+	printf("criando %s\n", dir);
 	struct superblock *sb = fs_open("disk.img");
 	fs_mkdir(sb, "/tomate/oi/peido14");
 	fs_close(sb);
 }
+
+
 
 void tFormata() {
 	struct superblock *sb = fs_format("disk.img", 128);
@@ -56,6 +59,13 @@ tAltosMkdir() {
 	fs_close(sb);
 }
 
+void tListDir() {
+	struct superblock *sb = fs_open("disk.img");
+	printf("%s\n\n", fs_list_dir(sb, "/home/"));	  // 
+
+	fs_close(sb);
+}
+
+
 int main() {
-	tAltosMkdir();
 }
