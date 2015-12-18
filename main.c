@@ -68,7 +68,29 @@ void tListDir() {
 	fs_close(sb);
 }
 
+void tWritefile() {
+	struct superblock *sb = fs_format("disk.img", 128);
+	char aaa[300];
+	strcpy(aaa, "Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!");
+	fs_write_file(sb, "/amaterasu.txt", aaa, 260);
+
+	fs_close(sb);
+}
+
+void tReadfile() {
+	struct superblock *sb = fs_open("disk.img");
+	char bbb[300];
+	ssize_t a = fs_read_file(sb, "/amaterasu.txt", bbb, 300);
+	printf("%ld\n", a);
+	if(a<0)
+		perror("");
+	printf("%s\n", bbb);
+	fs_close(sb);
+}
+
 
 int main() {
-	tProcuraDiretorio();
+	tWritefile();
+	tReadfile();
+	return 0;
 }
