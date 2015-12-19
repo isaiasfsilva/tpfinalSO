@@ -6,12 +6,10 @@
 #include <stdlib.h>
 
 void tMkdir(char dir[]) {
-	printf("criando %s\n", dir);
 	struct superblock *sb = fs_open("disk.img");
 	fs_mkdir(sb, "/tomate/oi/peido14");
 	fs_close(sb);
 }
-
 
 
 void tFormata() {
@@ -91,8 +89,39 @@ void tReadfile() {
 }
 
 
+void tRmdir() {
+	
+	struct superblock *sb = fs_open("disk.img");
+	char filename[550];
+	//struct superblock *sb = fs_open("disk.img");
+ 	int i;
+
+	for(i=0;i<=100;i++) {
+		printf("Removendo file%d\n",i);
+		char *as = fs_list_dir(sb, "/");
+	printf("%s\n\n", as);	  // 
+	free(as);
+
+		sprintf(filename, "file%d", i);
+		fs_rmdir(sb, filename);
+
+			char *ass = fs_list_dir(sb, "/");
+	printf("%s\n\n", ass);	  // 
+	free(ass);
+
+		printf("Done\n\n\n");
+	}
+
+
+
+	
+	fs_close(sb);
+}
+
 int main() {
-	tWritefile();
-	tReadfile();
+
+tFormata();
+tAltosMkdir();
+tRmdir();
 	return 0;
 }

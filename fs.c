@@ -604,11 +604,116 @@ int fs_mkdir(struct superblock *sb, const char *dname){
 	return 0;
 }
 
+
 int fs_rmdir(struct superblock *sb, const char *dname){
 
+	parDiretorioNome* pda;
+	struct inode* inodeDir, *fileInode, *auxInodeDir;
+	struct nodeinfo* nodeinfoDir, *fileInfo;
+	char *fnameCopy, *strRetorno;
+
+	uint64_t lastMetaInodeDir, lastMetaInfoInodeDir,lastMetaInodeDir2,llastMetaInodeDir;
+
+	pda = procuraDiretorio(sb, dname,1);
+	
+	if(pda==NULL)
+		return -1;
+
+ 
+	inodeDir = (struct inode*) malloc(sb->blksz);
+	nodeinfoDir = (struct nodeinfo*) malloc(sb->blksz);	
+	fileInode = (struct inode*) malloc(sb->blksz);
+	fileInfo = (struct nodeinfo*) malloc(sb->blksz);
+	auxInodeDir=(struct inode*) malloc(sb->blksz);
+
+	lastMetaInodeDir2=pda->dirInode;
+	lastMetaInodeDir=pda->dirInode;
+	llastMetaInodeDir=pda->dirInode;
+
+	lerDoDisco(sb, (void *) inodeDir, pda->dirInode, sb->blksz);
+	lerDoDisco(sb, (void *) nodeinfoDir, inodeDir->meta, sb->blksz);
+
+	lastMetaInfoInodeDir= inodeDir->meta;
+    
+    
+    int j=-1;
+    do{ // Encontra qual diretório que vou remover
+    	j++;
+		if( j!=0 && j%INODE_LINKS_LIMIT==0)  {
+			llastMetaInodeDir=lastMetaInodeDir2;
+			lastMetaInodeDir=lastMetaInodeDir2;
+			lastMetaInodeDir2=inodeDir->next;
+			lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
+		}
+
+		lerDoDisco(sb, (void *) fileInode, inodeDir->links[j%INODE_LINKS_LIMIT], sb->blksz);
+		lerDoDisco(sb, (void *) fileInfo, fileInode->meta, sb->blksz);
+		//printf("Endereço do links[j]%d\n", inodeDir->links[j%INODE_LINKS_LIMIT]);
+    }while(j < nodeinfoDir->size && strcmp(fileInfo->name,pda->arq)!=0);
 
 
+	if(strcmp(fileInfo->name,pda->arq)==0){			
+		if(fileInfo->size>0){ //Se diretório não estaá vazio
+			errno = ENOTEMPTY;
+			return -1;
+		}
+		fs_put_block(sb,inodeDir->links[j%INODE_LINKS_LIMIT]); //Recoloca Inode e Info de volta como livres
+		fs_put_block(sb,fileInode->meta);
+
+		memcpy(auxInodeDir, inodeDir, sb->blksz);
+
+
+		while(inodeDir->next!=0){ //Acha o ultimo carinha!
+			printf("é o ultimo carinha\n");
+			llastMetaInodeDir=lastMetaInodeDir;
+			lastMetaInodeDir = inodeDir->next;
+			lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
+			
+		} 
+
+		
+
+		nodeinfoDir->size--; 
+
+
+
+		auxInodeDir->links[j%INODE_LINKS_LIMIT] = inodeDir->links[(nodeinfoDir->size)%INODE_LINKS_LIMIT]; // Link[i] = links[i+1]; Observe que já deu --
+	    
+
+	    if((nodeinfoDir->size)%INODE_LINKS_LIMIT==0){
+	    	printf("iiiixi... size==1\n");
+	    	
+	    	
+
+	    	lerDoDisco(sb, (void *) inodeDir,llastMetaInodeDir, sb->blksz);
+	    	fs_put_block(sb,inodeDir->next);//Recoloca na freelist
+	    	inodeDir->next=0;
+	    	escreverNoDisco(sb, (void *) inodeDir, llastMetaInodeDir, sb->blksz);
+	    }
+			
+
+
+
+	escreverNoDisco(sb, (void *) auxInodeDir, lastMetaInodeDir2, sb->blksz);
+	escreverNoDisco(sb, (void *) nodeinfoDir, lastMetaInfoInodeDir, sb->blksz);
+
+
+		
+		
+	}else{ //DIRETORIO INEXISTENTE!!!!!
+		errno=ENOENT;
+		return -1;
+	}
+
+	free(inodeDir);
+	free(nodeinfoDir);
+	free(fileInode);
+	free(fileInfo);
+	free(auxInodeDir);
+	
 }
+
+
 
 
 //por enqautno eu acho que só lista diretorios. o link para o inode dos arquivos também está no links do inode do diretorio??? [Se Sim, então vai listar tudo]
