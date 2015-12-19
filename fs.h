@@ -26,6 +26,7 @@
 
  typedef struct {
 	uint64_t dirInode;
+	uint64_t fileInode;
 	char *arq;
 } parDiretorioNome;
 

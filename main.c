@@ -80,10 +80,12 @@ void tWritefile() {
 void tReadfile() {
 	struct superblock *sb = fs_open("disk.img");
 	char bbb[300];
-	ssize_t a = fs_read_file(sb, "/amaterasu.txt", bbb, 300);
-	printf("%ld\n", a);
-	if(a<0)
-		perror("");
+	int i;
+	for(i=0;i<300;i++) {
+		bbb[i] = 0;
+	}
+	fs_read_file(sb, "/amaterasu.txt", bbb, 300);
+
 	printf("%s\n", bbb);
 	fs_close(sb);
 }

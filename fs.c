@@ -31,7 +31,7 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname, cha
 	parDiretorioNome *pda;
 	char *fnameCopy, *strAux, *strAux2;
 	int dirCount, i;
-	uint64_t dirCorrente;
+	uint64_t dirCorrente, fileInodeAux;
 
 	
 	fnameCopy = (char *) malloc((strlen(fname) + 1) * sizeof(char));
@@ -87,6 +87,7 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname, cha
 					if(!strcmp(strAux, fileInfo->name)) {
 						achou = 1;
 						errno = 0;
+						fileInodeAux = dirInode->links[j%INODE_LINKS_LIMIT];
 						break;
 					}
 				}
@@ -117,6 +118,7 @@ parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname, cha
 	
 	pda = (parDiretorioNome *) malloc(sizeof(parDiretorioNome)); // Aloca estrutura de retorno
 	pda->dirInode = dirCorrente;
+	pda->fileInode = (removeFlag)?fileInodeAux:0;
 	pda->arq = (char *) malloc((strlen(strAux) + 1)*sizeof(char));
 	strcpy(pda->arq, strAux);
 	free(fnameCopy);
@@ -363,13 +365,13 @@ int fs_write_file(struct superblock *sb, const char *fname, char *buf,size_t cnt
 	free(nodeinfoDir);
 	free(inodeNewFile);
 	free(nodeinfoNewFile);
-	{ // Escrever o conteúdo do arquivo
+	 // Escrever o conteúdo do arquivo
 		int i;
 		uint64_t block, fileBlock, lastBlock;
-		struct inode *inodeAtual;
-		inodeAtual = (struct inode *) malloc(sb->blksz);
+		struct inode* inodeAtual;
+		inodeAtual = (struct inode*) malloc(sb->blksz);
 		lerDoDisco(sb, (void *) inodeAtual, nodeBlock, sb->blksz);
-		lastBlock = nodeBlock;
+		block = nodeBlock;
 		for(i=0; i < blocosDados; i++) {
 			if(i!=0 && i%INODE_LINKS_LIMIT==0) {
 				struct inode *nodeChild;
@@ -384,22 +386,22 @@ int fs_write_file(struct superblock *sb, const char *fname, char *buf,size_t cnt
 
 				escreverNoDisco(sb, (void *) inodeAtual, lastBlock, sb->blksz);
 				escreverNoDisco(sb, (void *) nodeChild, block, sb->blksz);
-				free(inodeAtual);
-				inodeAtual = nodeChild;
+				free(nodeChild);
+				lerDoDisco(sb, (void *) inodeAtual, block, sb->blksz);
 			}
 
 			fileBlock = fs_get_block(sb);
 			inodeAtual->links[i%INODE_LINKS_LIMIT] = fileBlock;
-			if(i+1!=blocosDados || cnt%sb->blksz==0){
-				escreverNoDisco(sb, (void *) &buf[i*sb->blksz], fileBlock, sb->blksz);
-			} else {
-				escreverNoDisco(sb, (void *) &buf[i*sb->blksz], fileBlock, cnt%sb->blksz);
-			}
+			if(i!=blocosDados-1 || cnt%sb->blksz==0)
+				escreverNoDisco(sb, (void *) (buf +(i*sb->blksz)), fileBlock, sb->blksz);
+			else
+				escreverNoDisco(sb, (void *) (buf +(i*sb->blksz)), fileBlock, cnt%sb->blksz);
 		}
-		escreverNoDisco(sb, (void *) &inodeAtual, lastBlock, sb->blksz);
-		free(inodeAtual);
 
-	}
+		escreverNoDisco(sb, (void *) inodeAtual, block, sb->blksz);
+		
+		free(inodeAtual);
+	
 
 	return 0;
 }
@@ -409,27 +411,23 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname, char *buf, size_t
 	parDiretorioNome *pda;
 	struct inode *fileInode, *dirInode;
 	struct nodeinfo *fileInodeInfo, *dirInodeInfo;
-	char *aux;
-
 	pda = procuraDiretorio(sb,fname,1);
 
-	if(pda == NULL){
+	if(pda == NULL)
 		return -1;
-	} else {
-		printf("%s %lu\n", pda->arq, pda->dirInode);
-	}
 
 	fileInode = (struct inode*) malloc(sb->blksz);
 	fileInodeInfo = (struct nodeinfo*) malloc(sb->blksz);
-	dirInode = (struct inode*) malloc(sb->blksz);
-	dirInodeInfo = (struct nodeinfo*) malloc(sb->blksz);
 
-	lerDoDisco(sb, (void *) dirInode, pda->dirInode, sb->blksz);
-	lerDoDisco(sb, (void *) dirInodeInfo, fileInode->meta, sb->blksz);
+	lerDoDisco(sb, (void *) fileInode, pda->fileInode, sb->blksz);
+	lerDoDisco(sb, (void *) fileInodeInfo, fileInode->meta, sb->blksz);
 	// TODO - Modificar retorno  da pda para parametro = 1
 	if (fileInode->mode != IMREG){ //se o inode não corresponder um arquivo
-		printf("%s\n", fileInodeInfo->name);
 		errno = EISDIR;
+		free(fileInode);
+		free(fileInodeInfo);
+		free(pda->arq);
+		free(pda);
 		return -1;
 		//retornar errno
 	}
@@ -443,15 +441,14 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname, char *buf, size_t
 			lerDoDisco(sb, (void *) fileInode, fileInode->next, sb->blksz);
 		}
 		if(i+1!=blockFiles || bufsz%sb->blksz==0)
-			lerDoDisco(sb, (void *) &buf[i*sb->blksz], fileInode->links[i%INODE_LINKS_LIMIT], sb->blksz);
+			lerDoDisco(sb, (void *) (buf +(i*sb->blksz)), fileInode->links[i%INODE_LINKS_LIMIT], sb->blksz);
 		else
-			lerDoDisco(sb, (void *) &buf[i*sb->blksz], fileInode->links[i%INODE_LINKS_LIMIT], bufsz%sb->blksz);
+			lerDoDisco(sb, (void *) (buf +(i*sb->blksz)), fileInode->links[i%INODE_LINKS_LIMIT], bufsz%sb->blksz);
 	}
 	free(pda->arq);
 	free(pda);
 	free(fileInode);
 	free(fileInodeInfo);
-	free(aux);
 	return (ssize_t) bufsz;
 }
 
@@ -550,7 +547,6 @@ int fs_mkdir(struct superblock *sb, const char *dname){
 	}
 
 	if(nodeinfoDir->size!= 0 && nodeinfoDir->size%INODE_LINKS_LIMIT==0) {
-		printf("I WANNA HEAL\n");
 		if(sb->freeblks<=2) { // Será necessário mais um bloco para o novo inode.
 			errno = ENOSPC;
 			free(pda->arq);
