@@ -11,6 +11,12 @@
 #define INODE_LINKS_LIMIT ((sb->blksz-32)/sizeof(uint64_t))
 #define NODEINFO_NAME_LIMIT (sb->blksz - 65)
 
+ typedef struct {
+	uint64_t dirInode;
+	uint64_t fileInode;
+	char *arq;
+} parDiretorioNome;
+
 unsigned long fsize(int fd) { // Obtem o tamanho do disco
     unsigned long len = (unsigned long) lseek(fd, 0, SEEK_END);
     return len;
@@ -285,16 +291,21 @@ int fs_write_file(struct superblock *sb, const char *fname, char *buf,size_t cnt
 	blocosNecessarios += ((blocosDados/INODE_LINKS_LIMIT) + ((blocosDados%INODE_LINKS_LIMIT)?1:0)) -1; // inodes child
 	blocosNecessarios += blocosDados; // Conteudo do arquivo
 	
+	parDiretorioNome* pda;
+	pda = procuraDiretorio(sb, fname, 1);
+	
+	if(pda!=NULL)
+		fs_unlink(sb, fname);
+
 	if(sb->freeblks<blocosNecessarios) {
 		errno = ENOSPC;
 		return -1;
 	}
 
-	parDiretorioNome* pda;
 	struct inode* inodeDir, *inodeNewFile;
 	struct nodeinfo *nodeinfoDir, *nodeinfoNewFile;
 	uint64_t lastMeta, nodeBlock, infoBlock, metaInfo;
-
+	
 	pda = procuraDiretorio(sb, fname, 0);
 	if(pda==NULL)
 		return -1;
@@ -468,11 +479,15 @@ int fs_unlink(struct superblock *sb, const char *fname){
 	lerDoDisco(sb, (void *) fileMeta, fileInode->meta, sb->blksz);
 	
 	uint64_t totalBlocks = fileMeta->size/sb->blksz;
-	uint64_t lastInodeBlocks = (totalBlocks%INODE_LINKS_LIMIT!=0)?totalBlocks%INODE_LINKS_LIMIT:INODE_LINKS_LIMIT;
+	uint64_t lastInodeBlocks = (totalBlocks%INODE_LINKS_LIMIT!=0)?totalBlocks%INODE_LINKS_LIMIT+1:INODE_LINKS_LIMIT;
 
 	fs_put_block(sb, fileInode->meta);
 	uint64_t nextFileBlock = pda->fileInode;
+	char flag = 1;
 	while(fileInode->next!=0) {
+		if(!flag)
+			lerDoDisco(sb, (void *) fileInode, fileInode->next, sb->blksz);
+		flag = 0;
 		uint64_t actualFileBlock = nextFileBlock;
 		uint64_t i;
 		if(fileInode->next!=0)
@@ -484,7 +499,6 @@ int fs_unlink(struct superblock *sb, const char *fname){
 		
 		if(fileInode->next!=0) 
 			nextFileBlock = fileInode->next;
-		lerDoDisco(sb, (void *) fileInode, fileInode->next, sb->blksz);
 		fs_put_block(sb, actualFileBlock);
 	}
 	free(fileInode);
@@ -738,22 +752,27 @@ char * fs_list_dir(struct superblock *sb, const char *dname){
 	struct inode* inodeDir, *fileInode;
 	struct nodeinfo* nodeinfoDir, *fileInfo;
 	char *fnameCopy, *strRetorno;
+	uint64_t blockToAnalyse;
 
 	fnameCopy = (char *) malloc((strlen(dname) + 1) * sizeof(char));
 	strcpy(fnameCopy, dname); // Copia o caminho para uma string que pode ser modificada
+	//strcat(fnameCopy," "); //Ele só add um espaco no final para a funcao [procuraDiretorio] retornar bonitinho *.*
 
-	strcat(fnameCopy," "); //Ele só add um espaco no final para a funcao [procuraDiretorio] retornar bonitinho *.*
-
-	pda = procuraDiretorio(sb, fnameCopy, 0);
-	if(pda==NULL)
-		return NULL;
+	if(!strcmp(dname, "/")) {
+		blockToAnalyse = sb->root;
+	} else {
+		pda = procuraDiretorio(sb, fnameCopy, 1);
+		if(pda==NULL)
+			return NULL;
+		blockToAnalyse = pda->fileInode;
+	}
 
 	inodeDir = (struct inode*) malloc(sb->blksz);
 	nodeinfoDir = (struct nodeinfo*) malloc(sb->blksz);
 	fileInfo = (struct nodeinfo*) malloc(sb->blksz);
 	fileInode = (struct inode*) malloc(sb->blksz);
 
-	lerDoDisco(sb, (void *) inodeDir, pda->dirInode, sb->blksz);
+	lerDoDisco(sb, (void *) inodeDir, blockToAnalyse, sb->blksz);
 	lerDoDisco(sb, (void *) nodeinfoDir, inodeDir->meta, sb->blksz);
 
 	strRetorno = (char *)malloc((nodeinfoDir->size * 255) * sizeof(char)); // Quantidade de itens * o máximo de cada nome
@@ -780,8 +799,10 @@ char * fs_list_dir(struct superblock *sb, const char *dname){
 
 	}
 
- 	free(pda->arq);
-	free(pda);
+	if(strcmp(dname, "/")) {
+	 	free(pda->arq);
+		free(pda);
+	}
 	free(inodeDir);
 	free(nodeinfoDir);
 	free(fileInfo);

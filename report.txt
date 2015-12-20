@@ -30,10 +30,11 @@ Deus, Fé, Simpatias, Google e StackOverflow: 1%
 4. Estruturas de dados
 
 -> typedef struct parDiretorioNome;
-	Estrutura que representa um par de Inode e Arquivo. O inode guarda
+	Estrutura que representa um par relacionando o Inode e Arquivo. O inode guarda
 	o endereço no sistema de arquivos do diretório onde a modificação
 	será feita e o Arquivo guarda o nome do arquivo ou da pasta a ser 
-	criado/deletado. 
+	criado/deletado. No caso onde se deseja buscar por um arquivo que já existe,
+	um terceiro campo é usado para obter o bloco onde esse arquivo se encontra.
 	  Esta estrutura é utilizada nas funções que desejam remover ou adicionar
 	um arquivo/diretório no sistema de arquivos. 
 	

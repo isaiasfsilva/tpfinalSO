@@ -24,12 +24,6 @@
 #define IMDIR 2   /* directory inode */
 #define IMCHILD 4 /* child inode */
 
- typedef struct {
-	uint64_t dirInode;
-	uint64_t fileInode;
-	char *arq;
-} parDiretorioNome;
-
 struct superblock {
 	uint64_t magic; /* 0xdcc605f5 */
 	uint64_t blks; /* number of blocks in the filesystem */
@@ -130,6 +124,5 @@ int fs_mkdir(struct superblock *sb, const char *dname);
 int fs_rmdir(struct superblock *sb, const char *dname);
 
 char * fs_list_dir(struct superblock *sb, const char *dname);
-parDiretorioNome* procuraDiretorio(struct superblock *sb, const char* fname, char removeFlag);
 
 #endif
