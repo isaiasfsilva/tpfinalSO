@@ -5,9 +5,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-void tMkdir(char dir[]) {
+void tMkdir() {
 	struct superblock *sb = fs_open("disk.img");
-	fs_mkdir(sb, "/tomate/oi/peido14");
+	fs_mkdir(sb, "/tomate/");
 	fs_close(sb);
 }
 
@@ -67,24 +67,30 @@ void tListDir() {
 }
 
 void tWritefile() {
-	struct superblock *sb = fs_format("disk.img", 128);
-	char aaa[300];
-	strcpy(aaa, "Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!");
-	fs_write_file(sb, "/amaterasu.txt", aaa, 260);
+	struct superblock *sb = fs_open("disk.img");
+	char aaa[2500];
+	strcpy(aaa, "Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce! Oi, eu me chamo Roberto, eh bom conversar com voce!");
+	fs_write_file(sb, "/amaterasu.txt", aaa, 2332);
 
 	fs_close(sb);
 }
 
 void tReadfile() {
 	struct superblock *sb = fs_open("disk.img");
-	char bbb[300];
+	char bbb[2500];
 	int i;
-	for(i=0;i<300;i++) {
+	for(i=0;i<2500;i++) {
 		bbb[i] = 0;
 	}
-	fs_read_file(sb, "/amaterasu.txt", bbb, 300);
+	fs_read_file(sb, "/amaterasu.txt", bbb, 2500);
 
 	printf("%s\n", bbb);
+	fs_close(sb);
+}
+
+void tUnlink() {
+	struct superblock *sb = fs_open("disk.img");
+	fs_unlink(sb, "/amaterasu.txt");
 	fs_close(sb);
 }
 
@@ -111,17 +117,15 @@ void tRmdir() {
 
 		printf("Done\n\n\n");
 	}
-
-
-
 	
 	fs_close(sb);
 }
 
 int main() {
-
 tFormata();
-tAltosMkdir();
-tRmdir();
+tMkdir();
+tWritefile();
+tReadfile();
+tUnlink();
 	return 0;
 }
