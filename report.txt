@@ -1,0 +1,45 @@
+SISTEMA DE ARQUIVO - RELATÓRIO
+
+1. Termo de compromisso
+
+Os membros do grupo afirmam que todo o código desenvolvido para este
+trabalho é de autoria própria.  Exceto pelo material listado no item
+3 deste relatório, os membros do grupo afirmam não ter copiado
+material da Internet nem obtiveram código de terceiros.
+
+2. Membros do grupo e alocação de esforço
+
+Preencha as linhas abaixo com o nome e o e-mail dos integrantes do
+grupo.  Substitua XX pela contribuição de cada membro do grupo no
+desenvolvimento do trabalho.
+
+Isaías Faria Silva <isaiasfaria@dcc.ufmg.br> 33%
+Lucas de Miranda Bastos <lucasmbastos@dcc.ufmg.br> 33%
+Victor Jorge <EMAIL DO VITIN@dcc.ufmg.br> 33%
+Deus, Fé, Simpatias, e derivados: 1%
+
+3. Referências bibliográficas
+
+	* manpage memcpy
+	* manpage open
+	* manpage lseek
+	* manpage write
+	* http://www.cplusplus.com/
+	  -> Disponibilzam alguns exeplos para funções em C
+
+4. Estruturas de dados
+
+-> typedef struct parDiretorioNome;
+	Estrutura que representa um par de Inode e Arquivo. O inode guarda
+	o endereço no sistema de arquivos do diretório onde a modificação
+	será feita e o Arquivo guarda o nome do arquivo ou da pasta a ser 
+	criado/deletado. 
+	  Esta estrutura é utilizada nas funções que desejam remover ou adicionar
+	um arquivo/diretório no sistema de arquivos. 
+	
+5. Testes
+
+Para cada função finalizada foi realizado um teste exclusivo e exaustivo para 
+validar seu correto funcionamento. Para as funções mkdir, list_dir e rmdir, por exemplo,
+são criados 300 diretórios, listados e removidos dinamicamente para verificar o correto
+funcionamento do sistema.
