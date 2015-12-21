@@ -666,9 +666,12 @@ int fs_rmdir(struct superblock *sb, const char *dname){
 	lastMetaInfoInodeDir= inodeDir->meta;
     
     
-    int j=-1;
+    uint64_t j=0;
+    char flag = 1;
     do{ // Encontra qual diretório que vou remover
-    	j++;
+    	if(!flag)
+    		j++;
+    	flag = 0;
 		if( j!=0 && j%INODE_LINKS_LIMIT==0)  {
 			llastMetaInodeDir=lastMetaInodeDir2;
 			lastMetaInodeDir=lastMetaInodeDir2;
@@ -678,7 +681,6 @@ int fs_rmdir(struct superblock *sb, const char *dname){
 
 		lerDoDisco(sb, (void *) fileInode, inodeDir->links[j%INODE_LINKS_LIMIT], sb->blksz);
 		lerDoDisco(sb, (void *) fileInfo, fileInode->meta, sb->blksz);
-		//printf("Endereço do links[j]%d\n", inodeDir->links[j%INODE_LINKS_LIMIT]);
     }while(j < nodeinfoDir->size && strcmp(fileInfo->name,pda->arq)!=0);
 
 
@@ -694,7 +696,6 @@ int fs_rmdir(struct superblock *sb, const char *dname){
 
 
 		while(inodeDir->next!=0){ //Acha o ultimo carinha!
-			printf("é o ultimo carinha\n");
 			llastMetaInodeDir=lastMetaInodeDir;
 			lastMetaInodeDir = inodeDir->next;
 			lerDoDisco(sb, (void *) inodeDir, inodeDir->next, sb->blksz);
@@ -710,11 +711,7 @@ int fs_rmdir(struct superblock *sb, const char *dname){
 		auxInodeDir->links[j%INODE_LINKS_LIMIT] = inodeDir->links[(nodeinfoDir->size)%INODE_LINKS_LIMIT]; // Link[i] = links[i+1]; Observe que já deu --
 	    
 
-	    if((nodeinfoDir->size)%INODE_LINKS_LIMIT==0){
-	    	printf("iiiixi... size==1\n");
-	    	
-	    	
-
+	    if((nodeinfoDir->size)%INODE_LINKS_LIMIT==0){	    	
 	    	lerDoDisco(sb, (void *) inodeDir,llastMetaInodeDir, sb->blksz);
 	    	fs_put_block(sb,inodeDir->next);//Recoloca na freelist
 	    	inodeDir->next=0;

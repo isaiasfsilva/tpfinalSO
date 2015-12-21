@@ -99,28 +99,8 @@ void tUnlink() {
 
 
 void tRmdir() {
-	
 	struct superblock *sb = fs_open("disk.img");
-	char filename[550];
-	//struct superblock *sb = fs_open("disk.img");
- 	int i;
-
-	for(i=0;i<=100;i++) {
-		printf("Removendo file%d\n",i);
-		char *as = fs_list_dir(sb, "/");
-	printf("%s\n\n", as);	  // 
-	free(as);
-
-		sprintf(filename, "file%d", i);
-		fs_rmdir(sb, filename);
-
-			char *ass = fs_list_dir(sb, "/");
-	printf("%s\n\n", ass);	  // 
-	free(ass);
-
-		printf("Done\n\n\n");
-	}
-	
+	fs_rmdir(sb, "/tomate/banana");
 	fs_close(sb);
 }
 
@@ -133,8 +113,11 @@ tReadfile();
 tWritefile2();
 tReadfile();
 tListDir();
+tRmdir();
+tListDir();
 tUnlink();
 tListDir();
+
 
 	return 0;
 }
